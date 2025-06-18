@@ -172,6 +172,8 @@ while(true) {
 					site_.endpoints[endpointId] = site_.endpoints[endpointId] || {};
 					let endpoint_ = site_.endpoints[endpointId]; // shortcut ref
 					endpoint_.name = endpoint.name || endpoint_.name;
+					endpoint_.responseTimeGood = endpoint.responseTimeGood
+					endpoint_.responseTimeWarning = endpoint.responseTimeWarning;
 					if(endpoint.link!==false)
 						endpoint_.link = endpoint.link || endpoint.url;
 					endpoint_.logs = endpoint_.logs || [];
@@ -186,6 +188,7 @@ while(true) {
 						});
 						let content = await response.text();
 						await delay(0); // Ensures that the entry was registered.
+						/*
 						let perf = performance.getEntriesByType('resource')[0];
 						if(perf) {
 							endpointStatus.dur = perf.responseEnd - perf.startTime; // total request duration
@@ -198,7 +201,20 @@ while(true) {
 							endpointStatus.ttfb = endpointStatus.dur;
 							config.verbose && console.log(`\tCould not use PerformanceResourceTiming API to measure request.`);
 						}
+						*/
+						endpointStatus.dns = 0; // DNS Lookup
+						endpointStatus.tcp = 0; // TCP handshake time
+						endpointStatus.ttfb = 0; // time to first byte -> Latency
+						endpointStatus.dll = 0; // time for content download
 
+						if(response.ok) {
+							let j = JSON.parse(content);
+							endpointStatus.dur = j.response_time;
+							endpointStatus.ttfb = endpointStatus.dur;
+							j.status == "UP" ? endpointStatus.err = null : endpointStatus.err = j.status || 'Unknown status';
+						}
+
+						/*
 						// HTTP Status Check
 						if(!endpoint.validStatus && !response.ok) {
 							endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
@@ -207,7 +223,6 @@ while(true) {
 							endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
 							continue;
 						}
-
 						// Content checks
 						if(endpoint.mustFind && !await checkContent(content, endpoint.mustFind)) {
 							endpointStatus.err = '"mustFind" check failed';
@@ -221,6 +236,7 @@ while(true) {
 							endpointStatus.err = '"customCheck" check failed';
 							continue;
 						}
+							*/
 					} catch(e) {
 						endpointStatus.err = String(e);
 						if(!endpointStatus.dur) {
@@ -248,25 +264,7 @@ while(true) {
 							} catch(e) {console.error(e);}
 						} else {
 							endpoint.consecutiveErrors = 0;
-							let emoji = '🟢';
-							if(endpointStatus.ttfb>config.responseTimeWarning) {
-								emoji = '🟥';
-								endpoint.consecutiveHighLatency = (endpoint.consecutiveHighLatency || 0) + 1;
-							} else {
-								endpoint.consecutiveHighLatency = 0;
-								if(endpointStatus.ttfb>config.responseTimeGood)
-									emoji = '🔶';
-							}
-							config.verbose && console.log(`\t${emoji} ${site.name || siteId} — ${endpoint.name || endpointId} [${endpointStatus.ttfb.toFixed(2)}ms]`);
-							try {
-								if(endpoint.consecutiveHighLatency>=config.consecutiveHighLatencyNotify) {
-									/*await*/ sendNotification( // Don't await to prevent blocking/delaying next pulse
-										`🟥 High Latency\n`+
-										`${site.name || siteId} — ${endpoint.name || endpointId} [${endpointStatus.ttfb.toFixed(2)}ms]\n`+
-										(endpoint.link!==false?`\n→ ${endpoint.link || endpoint.url}`:'')
-									);
-								}
-							} catch(e) {console.error(e);}
+							config.verbose && console.log(`\t${site.name || siteId} — ${endpoint.name || endpointId} [${endpointStatus.ttfb.toFixed(2)}ms]`);
 						}
 					}
 				}

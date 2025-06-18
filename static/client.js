@@ -49,11 +49,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 					$endpoint.append($endpointName);
 
 					let $statusBarEndpoint = document.createElement('status-bar');
-					endpointPoints.push($statusBarEndpoint.setLogs(endpoint.logs));
+					endpointPoints.push($statusBarEndpoint.setLogs(endpoint));
 					$endpoint.append($statusBarEndpoint);
 
 					$site.append($endpoint);
 				}
+				/*
 				if(nEndpoints>1) {
 					let $statusBar = document.createElement('status-bar');
 					let combinedLogs = [];
@@ -69,6 +70,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 					$statusBar.setLogs(combinedLogs);
 					$site.querySelector('h1').after($statusBar);
 				}
+				*/
 			}
 		} catch (error) {
 			setError("Error loading server status:", error);
@@ -101,7 +103,8 @@ class StatusBar extends HTMLElement {
 	constructor() {
 		super();
 	}
-	setLogs(logs) {
+	setLogs(endpoint) {
+		let logs = endpoint.logs || [];
 		this.innerHTML = '';
 		this.logs = logs;
 		let points = [];
@@ -125,9 +128,9 @@ class StatusBar extends HTMLElement {
 					status = 'outage';
 					$entry.querySelector('em').before(point.err);
 				} else {
-					if(point.ttfb > config.responseTimeWarning) {
+					if(point.ttfb > endpoint.responseTimeWarning) {
 						status = 'highly-degraded';
-					} else if(point.ttfb > config.responseTimeGood) {
+					} else if(point.ttfb > endpoint.responseTimeGood) {
 						status = 'degraded';
 					} else {
 						status = 'healthy';
