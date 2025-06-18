@@ -13,6 +13,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 			const status = await response.json();
 			$main.innerHTML = '';
 			config = status.config;
+			
+			let $title = document.querySelector('title');
+			$title.innerText = config.title || 'k8sPulse';
+			let $header = document.querySelector('header h1');
+			$header.innerText = config.title || 'k8sPulse';
+
 			lastPulse = status.lastPulse;
 			for (let [siteId, endpointIds] of status.ui) {
 				let site = status.sites[siteId];
@@ -54,23 +60,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 					$site.append($endpoint);
 				}
-				/*
-				if(nEndpoints>1) {
-					let $statusBar = document.createElement('status-bar');
-					let combinedLogs = [];
-					for(let i=0;i<config.nDataPoints;i++) {
-						let t = Math.max(...endpointPoints.map(p=>p[i]?.t).filter(p=>p));
-						let err = endpointPoints.map(p=>p[i]?.err).filter(p=>p).join("\n") || undefined;
-						let ttfb = Math.max(...endpointPoints.map(p=>p[i]?.ttfb).filter(p=>p));
-						let dur = Math.max(...endpointPoints.map(p=>p[i]?.dur).filter(p=>p));
-						let dns = Math.max(...endpointPoints.map(p=>p[i]?.dns).filter(p=>p));
-						let tcp = Math.max(...endpointPoints.map(p=>p[i]?.tcp).filter(p=>p));
-						combinedLogs.push({t, err, ttfb, dur, dns, tcp});
-					}
-					$statusBar.setLogs(combinedLogs);
-					$site.querySelector('h1').after($statusBar);
-				}
-				*/
 			}
 		} catch (error) {
 			setError("Error loading server status:", error);

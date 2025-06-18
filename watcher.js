@@ -1,4 +1,5 @@
 import {promises as fs, watchFile} from 'fs';
+import { title } from 'process';
 let config = (await import('./config.js')).default;
 
 watchFile('./config.js', async ()=>{ // Dynamically reload config and watch it for changes.
@@ -135,6 +136,7 @@ while(true) {
 		status = status || {};
 		status.sites = status.sites || {};
 		status.config = {
+			title					: config.title,
 			interval				: config.interval,
 			nDataPoints				: config.nDataPoints,
 			responseTimeGood		: config.responseTimeGood,
@@ -180,28 +182,12 @@ while(true) {
 					let start;
 					
 					try {
-						performance.clearResourceTimings();
-						start = performance.now();
 						let response = await fetch(endpoint.url, {
 							signal: AbortSignal.timeout(config.timeout),
 							...endpoint.request,
 						});
 						let content = await response.text();
 						await delay(0); // Ensures that the entry was registered.
-						/*
-						let perf = performance.getEntriesByType('resource')[0];
-						if(perf) {
-							endpointStatus.dur = perf.responseEnd - perf.startTime; // total request duration
-							endpointStatus.dns = perf.domainLookupEnd - perf.domainLookupStart; // DNS Lookup
-							endpointStatus.tcp = perf.connectEnd - perf.connectStart; // TCP handshake time
-							endpointStatus.ttfb = perf.responseStart - perf.requestStart; // time to first byte -> Latency
-							endpointStatus.dll = perf.responseEnd - perf.responseStart; // time for content download
-						} else { // backup in case entry was not registered
-							endpointStatus.dur = performance.now() - start;
-							endpointStatus.ttfb = endpointStatus.dur;
-							config.verbose && console.log(`\tCould not use PerformanceResourceTiming API to measure request.`);
-						}
-						*/
 						endpointStatus.dns = 0; // DNS Lookup
 						endpointStatus.tcp = 0; // TCP handshake time
 						endpointStatus.ttfb = 0; // time to first byte -> Latency
@@ -213,36 +199,8 @@ while(true) {
 							endpointStatus.ttfb = endpointStatus.dur;
 							j.status == "UP" ? endpointStatus.err = null : endpointStatus.err = j.status || 'Unknown status';
 						}
-
-						/*
-						// HTTP Status Check
-						if(!endpoint.validStatus && !response.ok) {
-							endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
-							continue;
-						} else if(endpoint.validStatus && ((Array.isArray(endpoint.validStatus) && !endpoint.validStatus.includes(response.status)) || (!Array.isArray(endpoint.validStatus) && endpoint.validStatus!=response.status))) {
-							endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
-							continue;
-						}
-						// Content checks
-						if(endpoint.mustFind && !await checkContent(content, endpoint.mustFind)) {
-							endpointStatus.err = '"mustFind" check failed';
-							continue;
-						}
-						if(endpoint.mustNotFind && !await checkContent(content, endpoint.mustNotFind, true)) {
-							endpointStatus.err = '"mustNotFind" check failed';
-							continue;
-						}
-						if(endpoint.customCheck && typeof endpoint.customCheck == 'function' && !await Promise.resolve(endpoint.customCheck(content, response))) {
-							endpointStatus.err = '"customCheck" check failed';
-							continue;
-						}
-							*/
 					} catch(e) {
 						endpointStatus.err = String(e);
-						if(!endpointStatus.dur) {
-							endpointStatus.dur = performance.now() - start;
-							endpointStatus.ttfb = endpointStatus.dur;
-						}
 					} finally {
 						endpoint_.logs.push(endpointStatus);
 						if(endpoint_.logs.length > config.logsMaxDatapoints) // Remove old datapoints

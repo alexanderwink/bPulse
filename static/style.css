@@ -11,13 +11,17 @@ body {
 	display:flex;
 	flex-flow:column nowrap;
 	align-items: center;
-	background-color: #212429;
-	color:#e4e4e4;
+	background-color: #e4e4e4;
+	color:#212429;
 	gap:25px;
-	font-family: "Fira Sans Condensed", sans-serif;
+	font-family: Arial, sans-serif;
 	padding:40px 20px;
 	min-height:100vh;
 	overflow-x:hidden;
+}
+header {
+	display: flex;
+	align-items: center;
 }
 .icon {
 	font-family: 'Material Symbols Outlined';
@@ -103,7 +107,6 @@ status-bar {
 		position:relative;
 		&[data-status="outage"] {
 			background:#ea1313;
-			border: 1px dashed #ffb704;
 		}
 		&[data-status="highly-degraded"] {
 			background:#cc263f;
@@ -115,7 +118,7 @@ status-bar {
 			background:#0a7b46;
 		}
 		&[data-status="none"] {
-			background:#4b4d50;
+			background:#949494;
 		}
 		& > div {
 			position:absolute;
@@ -126,7 +129,7 @@ status-bar {
 			opacity:0;
 			pointer-events: none;
 			padding:3px 8px;
-			background:#000000;
+			background:#ffffff;
 			border-radius:4px;
 
 			display: flex;
