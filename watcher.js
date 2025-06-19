@@ -174,29 +174,30 @@ while(true) {
 					site_.endpoints[endpointId] = site_.endpoints[endpointId] || {};
 					let endpoint_ = site_.endpoints[endpointId]; // shortcut ref
 					endpoint_.name = endpoint.name || endpoint_.name;
-					endpoint_.responseTimeGood = endpoint.responseTimeGood
-					endpoint_.responseTimeWarning = endpoint.responseTimeWarning;
+					endpoint_.description = endpoint.description || endpoint_.description;
+					endpoint_.responseTimeGood = endpoint.responseTimeGood || endpoint_.responseTimeGood
+					endpoint_.responseTimeWarning = endpoint.responseTimeWarning || endpoint_.responseTimeWarning;
 					if(endpoint.link!==false)
 						endpoint_.link = endpoint.link || endpoint.url;
 					endpoint_.logs = endpoint_.logs || [];
 					let start;
 					
 					try {
+						endpointStatus.dns = 0; // DNS Lookup
+						endpointStatus.tcp = 0; // TCP handshake time
+						endpointStatus.ttfb = 0; // time to first byte -> Latency
+						endpointStatus.dll = 0; // time for content download
+
 						let response = await fetch(endpoint.url, {
 							signal: AbortSignal.timeout(config.timeout),
 							...endpoint.request,
 						});
 						let content = await response.text();
 						await delay(0); // Ensures that the entry was registered.
-						endpointStatus.dns = 0; // DNS Lookup
-						endpointStatus.tcp = 0; // TCP handshake time
-						endpointStatus.ttfb = 0; // time to first byte -> Latency
-						endpointStatus.dll = 0; // time for content download
 
 						if(response.ok) {
 							let j = JSON.parse(content);
-							endpointStatus.dur = j.response_time;
-							endpointStatus.ttfb = endpointStatus.dur;
+							endpointStatus.dur = endpointStatus.ttfb = j.response_time;
 							j.status == "UP" ? endpointStatus.err = null : endpointStatus.err = j.status || 'Unknown status';
 						}
 					} catch(e) {

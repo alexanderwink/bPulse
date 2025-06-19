@@ -54,6 +54,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 					}
 					$endpoint.append($endpointName);
 
+					if(endpoint.description) {
+						$endpointDescription = document.createElement('i');
+						$endpointDescription.innerText = endpoint.description;
+						$endpoint.append($endpointDescription);
+					}
+
 					let $statusBarEndpoint = document.createElement('status-bar');
 					endpointPoints.push($statusBarEndpoint.setLogs(endpoint));
 					$endpoint.append($statusBarEndpoint);
