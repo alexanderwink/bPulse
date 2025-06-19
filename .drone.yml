@@ -1,0 +1,13 @@
+kind: pipeline
+name: default
+
+steps:
+  - name: build and publish docker
+    image: plugins/docker
+    settings:
+      repo: alexanderwink/bpulse
+      auto_tag: true
+      username:
+        from_secret: DOCKER_USERNAME
+      password:
+        from_secret: DOCKER_PASSWORD
