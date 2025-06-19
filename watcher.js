@@ -182,8 +182,13 @@ while(true) {
 					endpoint_.logs = endpoint_.logs || [];
 					let start;
 					
+					if(endpoint.type !== 'middleware' && endpoint.type !== 'direct') {
+						console.error("Enddpoint type must be 'middleware' or 'direct'. Missing for endpoint:", endpoint.id);
+					}
+
 					try {
 						if(endpoint.type === 'middleware') {
+							endpointStatus.dur = 0; // total request duration
 							endpointStatus.dns = 0; // DNS Lookup
 							endpointStatus.tcp = 0; // TCP handshake time
 							endpointStatus.ttfb = 0; // time to first byte -> Latency
@@ -248,6 +253,13 @@ while(true) {
 						}
 					} catch(e) {
 						endpointStatus.err = String(e);
+						if(endpoint.type !== 'middleware') {
+							if(!endpointStatus.dur) {
+								endpointStatus.dur = performance.now() - start;
+								endpointStatus.ttfb = endpointStatus.dur;
+							}
+						}
+						console.error(e);
 					} finally {
 						endpoint_.logs.push(endpointStatus);
 						if(endpoint_.logs.length > config.logsMaxDatapoints) // Remove old datapoints

@@ -15,9 +15,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 			config = status.config;
 			
 			let $title = document.querySelector('title');
-			$title.innerText = config.title || 'k8sPulse';
+			$title.innerText = config.title || 'bPulse';
 			let $header = document.querySelector('header h1');
-			$header.innerText = config.title || 'k8sPulse';
+			$header.innerText = config.title || 'bPulse';
 
 			lastPulse = status.lastPulse;
 			for (let [siteId, endpointIds] of status.ui) {
@@ -55,9 +55,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 					$endpoint.append($endpointName);
 
 					if(endpoint.description) {
-						$endpointDescription = document.createElement('i');
-						$endpointDescription.innerText = endpoint.description;
-						$endpoint.append($endpointDescription);
+						$endpointDescription = document.createElement('endpoint-info');
+						//$endpointDescription = document.createElement('div');
+						//$endpointDescription.innerText = endpoint.description;
+						$endpointDescription.innerHTML = '<span class="icon">info</span><div><strong></strong></div>';
+						$endpointDescription.querySelector('strong').innerText = endpoint.description;
+						$endpointName.append($endpointDescription);
 					}
 
 					let $statusBarEndpoint = document.createElement('status-bar');
@@ -69,18 +72,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 			}
 		} catch (error) {
 			setError("Error loading server status:", error);
+			console.log(error);
 		}
 	};
 	refreshStatus();
 	setInterval(refreshStatus, 60_000); // Refresh every minute
 });
-const formatDate = (date) => new Intl.DateTimeFormat('en-US', {
-	month: 'long',
+const formatDate = (date) => new Intl.DateTimeFormat('sv-SE', {
+	month: 'numeric',
 	day: 'numeric',
 	year: 'numeric',
 	hour: 'numeric',
-	minute: '2-digit',
-	hour12: true
+	minute: '2-digit'
 }).format(date);
 
 const findClosestPoint = (logs, t, maxDistance=Infinity) => {
