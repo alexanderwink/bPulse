@@ -212,12 +212,12 @@ while(true) {
 							endpointStatus.dll = 0; // time for content download
 
 							// Up query
-							let query = encodeURIComponent(config.defaultUpQuery.replaceAll('%s', endpoint.service));
+							let query = encodeURIComponent(config.defaultUpQuery.replaceAll('$1', endpoint.namespace).replaceAll('$2', endpoint.service));
 							let upResult = await queryPrometheus(query);
 							upResult >= 1 ? endpointStatus.err = null : endpointStatus.err = `Service ${endpoint.service} is down`;
 							
 							// Response time query
-							query = encodeURIComponent(config.defaultResponseTimeQuery.replaceAll('%s', endpoint.service));
+							query = encodeURIComponent(config.defaultResponseTimeQuery.replaceAll('$1', endpoint.namespace).replaceAll('$2', endpoint.service));
 							let rtResult = await queryPrometheus(query);
 							endpointStatus.ttfb = rtResult || 0;
 						} else {
