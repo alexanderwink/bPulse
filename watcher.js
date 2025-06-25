@@ -125,6 +125,22 @@ const sendNotification = async (message) => {
 		await sendEmailMessage(message);
 }
 
+const queryPrometheus = async (query) => {
+	let url = config.prometheusUrl+`/api/v1/query?query=${query}`;
+	let response = await fetch(url, {
+		signal: AbortSignal.timeout(config.timeout)
+	});
+	let content = await response.text();
+	await delay(0); // Ensures that the entry was registered.
+	
+	let json = JSON.parse(content);
+	let result = 0;
+	if(json && json.data && json.data.result && json.data.result.length > 0) {
+		result = parseFloat(json.data.result[0].value[1]);
+	}
+	return result;
+}
+
 while(true) {
 	config.verbose && console.log('🔄 Pulse');
 	let startPulse = Date.now();
@@ -165,7 +181,6 @@ while(true) {
 					let endpointStatus = {
 						t	: Date.now(),// time
 					};
-					config.verbose && console.log(`\tFetching endpoint: ${endpoint.url}`);
 					let endpointId = endpoint.id || handlize(endpoint.name) || 'endpoint';
 					let i = 1; let endpointId_ = endpointId;
 					while(endpointIds.includes(endpointId)) {endpointId = endpointId_+'-'+(++i)} // Ensure a unique endpoint id
@@ -182,31 +197,30 @@ while(true) {
 					endpoint_.logs = endpoint_.logs || [];
 					let start;
 					
-					if(endpoint.type !== 'middleware' && endpoint.type !== 'direct') {
-						console.error("Enddpoint type must be 'middleware' or 'direct'. Missing for endpoint:", endpoint.id);
+					if(endpoint.type !== 'prometheus' && endpoint.type !== 'direct') {
+						console.error("Enddpoint type must be 'prometheus' or 'direct'. Missing for endpoint:", endpoint.id);
 					}
 
 					try {
-						if(endpoint.type === 'middleware') {
+						if(endpoint.type === 'prometheus') {
+							config.verbose && console.log(`\tFetching from prometheus`);
 							endpointStatus.dur = 0; // total request duration
 							endpointStatus.dns = 0; // DNS Lookup
 							endpointStatus.tcp = 0; // TCP handshake time
 							endpointStatus.ttfb = 0; // time to first byte -> Latency
 							endpointStatus.dll = 0; // time for content download
 
-							let response = await fetch(endpoint.url, {
-								signal: AbortSignal.timeout(config.timeout),
-								...endpoint.request,
-							});
-							let content = await response.text();
-							await delay(0); // Ensures that the entry was registered.
-
-							if(response.ok) {
-								let j = JSON.parse(content);
-								endpointStatus.ttfb = j.response_time;
-								j.status == "UP" ? endpointStatus.err = null : endpointStatus.err = j.status || 'Unknown status';
-							}
+							// Up query
+							let query = encodeURIComponent(config.defaultUpQuery.replaceAll('%s', endpoint.service));
+							let upResult = await queryPrometheus(query);
+							upResult >= 1 ? endpointStatus.err = null : endpointStatus.err = `Service ${endpoint.service} is down`;
+							
+							// Response time query
+							query = encodeURIComponent(config.defaultResponseTimeQuery.replaceAll('%s', endpoint.service));
+							let rtResult = await queryPrometheus(query);
+							endpointStatus.ttfb = rtResult || 0;
 						} else {
+							config.verbose && console.log(`\tFetching endpoint: ${endpoint.url}`);
 							performance.clearResourceTimings();
 							start = performance.now();
 							let response = await fetch(endpoint.url, {
@@ -253,7 +267,7 @@ while(true) {
 						}
 					} catch(e) {
 						endpointStatus.err = String(e);
-						if(endpoint.type !== 'middleware') {
+						if(endpoint.type !== 'prometheus') {
 							if(!endpointStatus.dur) {
 								endpointStatus.dur = performance.now() - start;
 								endpointStatus.ttfb = endpointStatus.dur;

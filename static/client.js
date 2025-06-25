@@ -56,8 +56,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 					if(endpoint.description) {
 						$endpointDescription = document.createElement('endpoint-info');
-						//$endpointDescription = document.createElement('div');
-						//$endpointDescription.innerText = endpoint.description;
 						$endpointDescription.innerHTML = '<span class="icon">info</span><div><strong></strong></div>';
 						$endpointDescription.querySelector('strong').innerText = endpoint.description;
 						$endpointName.append($endpointDescription);
@@ -68,6 +66,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 					$endpoint.append($statusBarEndpoint);
 
 					$site.append($endpoint);
+				}
+				if(nEndpoints>1) {
+					let $statusBar = document.createElement('status-bar');
+					let combinedLogs = [];
+					for(let i=0;i<config.nDataPoints;i++) {
+						let t = Math.max(...endpointPoints.map(p=>p[i]?.t).filter(p=>p));
+						let err = endpointPoints.map(p=>p[i]?.err).filter(p=>p).join("\n") || undefined;
+						let ttfb = Math.max(...endpointPoints.map(p=>p[i]?.ttfb).filter(p=>p));
+						let dur = Math.max(...endpointPoints.map(p=>p[i]?.dur).filter(p=>p));
+						let dns = Math.max(...endpointPoints.map(p=>p[i]?.dns).filter(p=>p));
+						let tcp = Math.max(...endpointPoints.map(p=>p[i]?.tcp).filter(p=>p));
+						combinedLogs.push({t, err, ttfb, dur, dns, tcp});
+					}
+					$statusBar.setLogs(combinedLogs);
+					$site.querySelector('h1').after($statusBar);
 				}
 			}
 		} catch (error) {
