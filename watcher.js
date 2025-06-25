@@ -1,4 +1,5 @@
 import {promises as fs, watchFile} from 'fs';
+import { title } from 'process';
 let config = (await import('./config.js')).default;
 
 watchFile('./config.js', async ()=>{ // Dynamically reload config and watch it for changes.
@@ -124,6 +125,22 @@ const sendNotification = async (message) => {
 		await sendEmailMessage(message);
 }
 
+const queryPrometheus = async (query) => {
+	let url = config.prometheusUrl+`/api/v1/query?query=${query}`;
+	let response = await fetch(url, {
+		signal: AbortSignal.timeout(config.timeout)
+	});
+	let content = await response.text();
+	await delay(0); // Ensures that the entry was registered.
+	
+	let json = JSON.parse(content);
+	let result = 0;
+	if(json && json.data && json.data.result && json.data.result.length > 0) {
+		result = parseFloat(json.data.result[0].value[1]);
+	}
+	return result;
+}
+
 while(true) {
 	config.verbose && console.log('🔄 Pulse');
 	let startPulse = Date.now();
@@ -135,6 +152,8 @@ while(true) {
 		status = status || {};
 		status.sites = status.sites || {};
 		status.config = {
+			title					: config.title,
+			combinedBar				: config.combinedBar === undefined ? true : config.combinedBar,
 			interval				: config.interval,
 			nDataPoints				: config.nDataPoints,
 			responseTimeGood		: config.responseTimeGood,
@@ -163,7 +182,6 @@ while(true) {
 					let endpointStatus = {
 						t	: Date.now(),// time
 					};
-					config.verbose && console.log(`\tFetching endpoint: ${endpoint.url}`);
 					let endpointId = endpoint.id || handlize(endpoint.name) || 'endpoint';
 					let i = 1; let endpointId_ = endpointId;
 					while(endpointIds.includes(endpointId)) {endpointId = endpointId_+'-'+(++i)} // Ensure a unique endpoint id
@@ -172,61 +190,93 @@ while(true) {
 					site_.endpoints[endpointId] = site_.endpoints[endpointId] || {};
 					let endpoint_ = site_.endpoints[endpointId]; // shortcut ref
 					endpoint_.name = endpoint.name || endpoint_.name;
+					endpoint_.description = endpoint.description || endpoint_.description;
+					endpoint_.responseTimeGood = endpoint.responseTimeGood || endpoint_.responseTimeGood
+					endpoint_.responseTimeWarning = endpoint.responseTimeWarning || endpoint_.responseTimeWarning;
 					if(endpoint.link!==false)
 						endpoint_.link = endpoint.link || endpoint.url;
 					endpoint_.logs = endpoint_.logs || [];
 					let start;
 					
+					if(endpoint.type !== 'prometheus' && endpoint.type !== 'direct') {
+						console.error("Enddpoint type must be 'prometheus' or 'direct'. Missing for endpoint:", endpoint.id);
+					}
+
 					try {
-						performance.clearResourceTimings();
-						start = performance.now();
-						let response = await fetch(endpoint.url, {
-							signal: AbortSignal.timeout(config.timeout),
-							...endpoint.request,
-						});
-						let content = await response.text();
-						await delay(0); // Ensures that the entry was registered.
-						let perf = performance.getEntriesByType('resource')[0];
-						if(perf) {
-							endpointStatus.dur = perf.responseEnd - perf.startTime; // total request duration
-							endpointStatus.dns = perf.domainLookupEnd - perf.domainLookupStart; // DNS Lookup
-							endpointStatus.tcp = perf.connectEnd - perf.connectStart; // TCP handshake time
-							endpointStatus.ttfb = perf.responseStart - perf.requestStart; // time to first byte -> Latency
-							endpointStatus.dll = perf.responseEnd - perf.responseStart; // time for content download
-						} else { // backup in case entry was not registered
-							endpointStatus.dur = performance.now() - start;
-							endpointStatus.ttfb = endpointStatus.dur;
-							config.verbose && console.log(`\tCould not use PerformanceResourceTiming API to measure request.`);
-						}
+						if(endpoint.type === 'prometheus') {
+							config.verbose && console.log(`\tFetching from prometheus`);
+							endpointStatus.dur = 0; // total request duration
+							endpointStatus.dns = 0; // DNS Lookup
+							endpointStatus.tcp = 0; // TCP handshake time
+							endpointStatus.ttfb = 0; // time to first byte -> Latency
+							endpointStatus.dll = 0; // time for content download
 
-						// HTTP Status Check
-						if(!endpoint.validStatus && !response.ok) {
-							endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
-							continue;
-						} else if(endpoint.validStatus && ((Array.isArray(endpoint.validStatus) && !endpoint.validStatus.includes(response.status)) || (!Array.isArray(endpoint.validStatus) && endpoint.validStatus!=response.status))) {
-							endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
-							continue;
-						}
+							// Up query
+							let query = endpoint.upQuery || config.defaultUpQuery;
+							let encodedquery = encodeURIComponent(query.replaceAll('$1', endpoint.namespace).replaceAll('$2', endpoint.service));
+							let upResult = await queryPrometheus(encodedquery);
+							upResult >= 1 ? endpointStatus.err = null : endpointStatus.err = `Service ${endpoint.service} is down`;
+							
+							// Response time query
+							query = endpoint.responseTimeQuery || config.defaultResponseTimeQuery;
+							encodedquery = encodeURIComponent(query.replaceAll('$1', endpoint.namespace).replaceAll('$2', endpoint.service));
+							let rtResult = await queryPrometheus(encodedquery);
+							endpointStatus.ttfb = rtResult || 0;
+						} else {
+							config.verbose && console.log(`\tFetching endpoint: ${endpoint.url}`);
+							performance.clearResourceTimings();
+							start = performance.now();
+							let response = await fetch(endpoint.url, {
+								signal: AbortSignal.timeout(config.timeout),
+								...endpoint.request,
+							});
+							let content = await response.text();
+							await delay(0); // Ensures that the entry was registered.
+							let perf = performance.getEntriesByType('resource')[0];
+							if(perf) {
+								endpointStatus.dur = perf.responseEnd - perf.startTime; // total request duration
+								endpointStatus.dns = perf.domainLookupEnd - perf.domainLookupStart; // DNS Lookup
+								endpointStatus.tcp = perf.connectEnd - perf.connectStart; // TCP handshake time
+								endpointStatus.ttfb = perf.responseStart - perf.requestStart; // time to first byte -> Latency
+								endpointStatus.dll = perf.responseEnd - perf.responseStart; // time for content download
+							} else { // backup in case entry was not registered
+								endpointStatus.dur = performance.now() - start;
+								endpointStatus.ttfb = endpointStatus.dur;
+								config.verbose && console.log(`\tCould not use PerformanceResourceTiming API to measure request.`);
+							}
 
-						// Content checks
-						if(endpoint.mustFind && !await checkContent(content, endpoint.mustFind)) {
-							endpointStatus.err = '"mustFind" check failed';
-							continue;
-						}
-						if(endpoint.mustNotFind && !await checkContent(content, endpoint.mustNotFind, true)) {
-							endpointStatus.err = '"mustNotFind" check failed';
-							continue;
-						}
-						if(endpoint.customCheck && typeof endpoint.customCheck == 'function' && !await Promise.resolve(endpoint.customCheck(content, response))) {
-							endpointStatus.err = '"customCheck" check failed';
-							continue;
+							// HTTP Status Check
+							if(!endpoint.validStatus && !response.ok) {
+								endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
+								continue;
+							} else if(endpoint.validStatus && ((Array.isArray(endpoint.validStatus) && !endpoint.validStatus.includes(response.status)) || (!Array.isArray(endpoint.validStatus) && endpoint.validStatus!=response.status))) {
+								endpointStatus.err = `HTTP Status ${response.status}: ${response.statusText}`;
+								continue;
+							}
+
+							// Content checks
+							if(endpoint.mustFind && !await checkContent(content, endpoint.mustFind)) {
+								endpointStatus.err = '"mustFind" check failed';
+								continue;
+							}
+							if(endpoint.mustNotFind && !await checkContent(content, endpoint.mustNotFind, true)) {
+								endpointStatus.err = '"mustNotFind" check failed';
+								continue;
+							}
+							if(endpoint.customCheck && typeof endpoint.customCheck == 'function' && !await Promise.resolve(endpoint.customCheck(content, response))) {
+								endpointStatus.err = '"customCheck" check failed';
+								continue;
+							}
 						}
 					} catch(e) {
 						endpointStatus.err = String(e);
-						if(!endpointStatus.dur) {
-							endpointStatus.dur = performance.now() - start;
-							endpointStatus.ttfb = endpointStatus.dur;
+						if(endpoint.type !== 'prometheus') {
+							if(!endpointStatus.dur) {
+								endpointStatus.dur = performance.now() - start;
+								endpointStatus.ttfb = endpointStatus.dur;
+							}
 						}
+						console.error(e);
 					} finally {
 						endpoint_.logs.push(endpointStatus);
 						if(endpoint_.logs.length > config.logsMaxDatapoints) // Remove old datapoints
@@ -248,25 +298,7 @@ while(true) {
 							} catch(e) {console.error(e);}
 						} else {
 							endpoint.consecutiveErrors = 0;
-							let emoji = '🟢';
-							if(endpointStatus.ttfb>config.responseTimeWarning) {
-								emoji = '🟥';
-								endpoint.consecutiveHighLatency = (endpoint.consecutiveHighLatency || 0) + 1;
-							} else {
-								endpoint.consecutiveHighLatency = 0;
-								if(endpointStatus.ttfb>config.responseTimeGood)
-									emoji = '🔶';
-							}
-							config.verbose && console.log(`\t${emoji} ${site.name || siteId} — ${endpoint.name || endpointId} [${endpointStatus.ttfb.toFixed(2)}ms]`);
-							try {
-								if(endpoint.consecutiveHighLatency>=config.consecutiveHighLatencyNotify) {
-									/*await*/ sendNotification( // Don't await to prevent blocking/delaying next pulse
-										`🟥 High Latency\n`+
-										`${site.name || siteId} — ${endpoint.name || endpointId} [${endpointStatus.ttfb.toFixed(2)}ms]\n`+
-										(endpoint.link!==false?`\n→ ${endpoint.link || endpoint.url}`:'')
-									);
-								}
-							} catch(e) {console.error(e);}
+							config.verbose && console.log(`\t${site.name || siteId} — ${endpoint.name || endpointId} [${endpointStatus.ttfb.toFixed(2)}ms]`);
 						}
 					}
 				}

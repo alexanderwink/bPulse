@@ -13,6 +13,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 			const status = await response.json();
 			$main.innerHTML = '';
 			config = status.config;
+			
+			let $title = document.querySelector('title');
+			$title.innerText = config.title || 'bPulse';
+			let $header = document.querySelector('header h1');
+			$header.innerText = config.title || 'bPulse';
+
 			lastPulse = status.lastPulse;
 			for (let [siteId, endpointIds] of status.ui) {
 				let site = status.sites[siteId];
@@ -48,13 +54,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 					}
 					$endpoint.append($endpointName);
 
+					if(endpoint.description) {
+						$endpointDescription = document.createElement('endpoint-info');
+						$endpointDescription.innerHTML = '<span class="icon">info</span><div><strong></strong></div>';
+						$endpointDescription.querySelector('strong').innerText = endpoint.description;
+						$endpointName.append($endpointDescription);
+					}
+
 					let $statusBarEndpoint = document.createElement('status-bar');
-					endpointPoints.push($statusBarEndpoint.setLogs(endpoint.logs));
+					endpointPoints.push($statusBarEndpoint.setLogs(endpoint));
 					$endpoint.append($statusBarEndpoint);
 
 					$site.append($endpoint);
 				}
-				if(nEndpoints>1) {
+				if(config.combinedBar && nEndpoints>1) {
 					let $statusBar = document.createElement('status-bar');
 					let combinedLogs = [];
 					for(let i=0;i<config.nDataPoints;i++) {
@@ -66,24 +79,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 						let tcp = Math.max(...endpointPoints.map(p=>p[i]?.tcp).filter(p=>p));
 						combinedLogs.push({t, err, ttfb, dur, dns, tcp});
 					}
-					$statusBar.setLogs(combinedLogs);
+					$statusBar.setLogs({logs: combinedLogs, responseTimeGood: config.responseTimeGood, responseTimeWarning: config.responseTimeWarning});
 					$site.querySelector('h1').after($statusBar);
 				}
 			}
 		} catch (error) {
 			setError("Error loading server status:", error);
+			console.log(error);
 		}
 	};
 	refreshStatus();
 	setInterval(refreshStatus, 60_000); // Refresh every minute
 });
-const formatDate = (date) => new Intl.DateTimeFormat('en-US', {
-	month: 'long',
+const formatDate = (date) => new Intl.DateTimeFormat('sv-SE', {
+	month: 'numeric',
 	day: 'numeric',
 	year: 'numeric',
 	hour: 'numeric',
-	minute: '2-digit',
-	hour12: true
+	minute: '2-digit'
 }).format(date);
 
 const findClosestPoint = (logs, t, maxDistance=Infinity) => {
@@ -101,7 +114,9 @@ class StatusBar extends HTMLElement {
 	constructor() {
 		super();
 	}
-	setLogs(logs) {
+	setLogs(endpoint) {
+		console.log(endpoint);
+		let logs = endpoint.logs || [];
 		this.innerHTML = '';
 		this.logs = logs;
 		let points = [];
@@ -125,9 +140,9 @@ class StatusBar extends HTMLElement {
 					status = 'outage';
 					$entry.querySelector('em').before(point.err);
 				} else {
-					if(point.ttfb > config.responseTimeWarning) {
+					if(point.ttfb > endpoint.responseTimeWarning) {
 						status = 'highly-degraded';
-					} else if(point.ttfb > config.responseTimeGood) {
+					} else if(point.ttfb > endpoint.responseTimeGood) {
 						status = 'degraded';
 					} else {
 						status = 'healthy';
