@@ -42,8 +42,8 @@ export default {
 			name			: 'Sites',
 			endpoints		: [ // Each site is a bunch of endpoints that can be tested
 				{
-					id				    : 'homepage', // optional
-					name			    : 'Homepage', // optional
+					id				    : 'homepage',
+					name			    : 'Homepage',
                     description		    : 'Google Homepage', // optional, description of the endpoint
                     type                : 'direct', // Type of endpoint, must be 'prometheus' or 'direct'
 					link			    : 'https://www.google.com', // optional, for notifications and dashboard only, [defaults to endpoint.url], can be disabled by setting it to false
@@ -59,12 +59,14 @@ export default {
 					validStatus		    : [200], // optional, Which http status should be considered non errors [defaults to 200-299]
 				},
                 {
-					id				: 'myservice',
-					name			: 'My k8s service',
-					link			: false,
-					type			: 'prometheus',
-                    namespace       : 'default', // optional, the namespace of the service, required for prometheus endpoints  
-					service			: 'myservice', // Required for prometheus endpoints, the service name to query
+					id				    : 'myservice',
+					name			    : 'My k8s service',
+					link			    : false,
+					type			    : 'prometheus',
+                    namespace           : 'default', // optional, the namespace of the service, required for prometheus endpoints  
+					service			    : 'myservice', // Required for prometheus endpoints, the service name to query
+                    upQuery		        : 'sum(up{namespace="$1", service="$2"})', // optional, overrides the global defaultUpQuery for this endpoint
+  	                responseTimeQuery   : 'sum(rate(http_request_duration_seconds_sum{namespace="$1", service =~ "$2", controller=~ ".+"}[5m])) /sum(rate(http_request_duration_seconds_count{namespace="$1", service =~ "$2", controller=~ ".+"}[5m]))*1000', // optional, overrides the global defaultResponseTimeQuery for this endpoint
 					responseTimeGood	: 500,
 					responseTimeWarning	: 1000,
 				}
