@@ -153,6 +153,7 @@ while(true) {
 		status.sites = status.sites || {};
 		status.config = {
 			title					: config.title,
+			combinedBar				: config.combinedBar === undefined ? true : config.combinedBar,
 			interval				: config.interval,
 			nDataPoints				: config.nDataPoints,
 			responseTimeGood		: config.responseTimeGood,

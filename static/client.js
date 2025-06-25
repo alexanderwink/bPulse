@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 					$site.append($endpoint);
 				}
-				if(nEndpoints>1) {
+				if(config.combinedBar && nEndpoints>1) {
 					let $statusBar = document.createElement('status-bar');
 					let combinedLogs = [];
 					for(let i=0;i<config.nDataPoints;i++) {
@@ -79,7 +79,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 						let tcp = Math.max(...endpointPoints.map(p=>p[i]?.tcp).filter(p=>p));
 						combinedLogs.push({t, err, ttfb, dur, dns, tcp});
 					}
-					$statusBar.setLogs(combinedLogs);
+					$statusBar.setLogs({logs: combinedLogs, responseTimeGood: config.responseTimeGood, responseTimeWarning: config.responseTimeWarning});
 					$site.querySelector('h1').after($statusBar);
 				}
 			}
@@ -115,6 +115,7 @@ class StatusBar extends HTMLElement {
 		super();
 	}
 	setLogs(endpoint) {
+		console.log(endpoint);
 		let logs = endpoint.logs || [];
 		this.innerHTML = '';
 		this.logs = logs;
