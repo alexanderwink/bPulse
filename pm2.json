@@ -1,6 +1,13 @@
 {
-	"apps": [{
-		"name"			: "aPulse",
-		"script"		: "./watcher.js"
-	}]
+  "apps": [
+    {
+      "name": "watcher",
+      "script": "watcher.js"
+    },
+    {
+      "name": "static-server",
+      "script": "/bin/sh",
+      "args": ["-c", "serve -s static -l 8080"]
+    }
+  ]
 }
