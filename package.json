@@ -1,5 +1,5 @@
 {
-  "name": "aPulse",
+  "name": "bPulse",
   "version": "1.0.0",
   "type": "module",
   "description": "A one-file NodeJS server status monitoring/notification tool.",
@@ -8,6 +8,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node watcher.js"
   },
-  "author": "ybouane",
+  "author": "alexanderwink",
   "license": "Apache-2.0"
 }
