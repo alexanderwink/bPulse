@@ -13,7 +13,7 @@ Based on the great work done by https://github.com/ybouane/aPulse
 - Uses the Fetch API to test server-responses, you can configure GET, POST, PUT... requests and have full control over the fetch options.
 - Check content for validity, HTTP status...
 - Measures latency
-- Minimal and easy to use dashboard
+- Clean, modern dashboard with an overall status banner, uptime %, and automatic dark mode
 - Easy to setup. Run the watcher.js script and open the static/index.html page to view the dashboard.
 - Auto-reload of the config file (no need to restart the watcher)
 - No dependencies
