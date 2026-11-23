@@ -1,6 +1,36 @@
 let config;
 let lastPulse = 0;
 const setError = (text)=>{document.querySelector('error-notice').innerText = text;};
+
+const el = (tag, className, text) => {
+	const $e = document.createElement(tag);
+	if(className) $e.className = className;
+	if(text !== undefined) $e.innerText = text;
+	return $e;
+};
+
+const renderBanner = (overall) => {
+	const $banner = document.querySelector('status-banner');
+	$banner.setAttribute('data-level', overall.level);
+	$banner.innerHTML = '<span class="dot"></span><div><strong></strong><small></small></div>';
+	$banner.querySelector('strong').innerText = overall.title;
+	$banner.querySelector('small').innerText = lastPulse ? `Updated ${bPulse.formatAgo(Date.now() - lastPulse)}` : '';
+};
+
+const isStale = () => !lastPulse || lastPulse < (Date.now() - config.interval*60_000 - 20_000); // Grace period of 20sec -> Watcher is probably down
+
+// Card with a title row (name + uptime), the status bar and a time axis
+const renderCard = (title, statusBar, points, className = '') => {
+	const $card = el('div', `card ${className}`.trim());
+	const $head = el('div', 'card-head');
+	const uptime = bPulse.uptimePercent(points);
+	$head.append(title, el('span', 'uptime', uptime === null ? 'No data' : `${bPulse.formatUptime(uptime)} uptime`));
+	const $axis = el('div', 'axis');
+	$axis.append(el('span', '', bPulse.formatAgo(config.nDataPoints * config.interval * 60_000)), el('span', '', 'now'));
+	$card.append($head, statusBar, $axis);
+	return $card;
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
 	let $main = document.querySelector('main');
 	const refreshStatus = async () => {
@@ -12,25 +42,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 			setError(''); // Clear errors
 			const status = await response.json();
 			$main.innerHTML = '';
-			config = status.config;
-			
-			let $title = document.querySelector('title');
-			$title.innerText = config.title || 'bPulse';
-			let $header = document.querySelector('header h1');
-			$header.innerText = config.title || 'bPulse';
+			config = status.config || {};
 
-			lastPulse = status.lastPulse;
+			const title = config.title || 'bPulse';
+			document.querySelector('title').innerText = `${title} — Status`;
+			document.querySelector('header h1').innerText = title;
+
+			lastPulse = status.lastPulse || 0;
+			if(!status.ui || !status.sites) {
+				renderBanner(bPulse.overallStatus([], {stale: true}));
+				return;
+			}
+			const latest = []; // [{name, status}] for the banner
 			for (let [siteId, endpointIds] of status.ui) {
 				let site = status.sites[siteId];
 				if(!site)
 					continue;
 
-				let $site = document.createElement('div');
-				$site.classList.add('site');
-				let $siteName = document.createElement('h1');
-				$siteName.innerText = site.name;
+				let $site = el('section', 'site');
+				let $siteName = el('h2', 'site-name', site.name);
 				$site.append($siteName);
-
 				$main.append($site);
 
 				let nEndpoints = 0;
@@ -38,34 +69,33 @@ document.addEventListener("DOMContentLoaded", async () => {
 				for (let endpointId of endpointIds) {
 					let endpoint = site.endpoints[endpointId];
 					if(!endpoint)
-							continue;
+						continue;
 					nEndpoints++;
-					let $endpoint = document.createElement('div');
-					$endpoint.classList.add('endpoint');
 
-					$endpointName = document.createElement('h3');
-					$endpointName.innerText = endpoint.name;
+					let $endpointName = el('h3', '', endpoint.name);
 					if(endpoint.link) {
 						let $link = document.createElement('a');
 						$link.href = endpoint.link;
 						$link.target = '_blank';
+						$link.rel = 'noopener';
+						$link.title = 'Open';
 						$link.innerHTML = '<span class="icon">open_in_new</span>';
 						$endpointName.append($link);
 					}
-					$endpoint.append($endpointName);
-
 					if(endpoint.description) {
-						$endpointDescription = document.createElement('endpoint-info');
+						let $endpointDescription = document.createElement('endpoint-info');
+						$endpointDescription.setAttribute('tabindex', 0);
 						$endpointDescription.innerHTML = '<span class="icon">info</span><div><strong></strong></div>';
 						$endpointDescription.querySelector('strong').innerText = endpoint.description;
 						$endpointName.append($endpointDescription);
 					}
 
-					let $statusBarEndpoint = document.createElement('status-bar');
-					endpointPoints.push($statusBarEndpoint.setLogs(endpoint));
-					$endpoint.append($statusBarEndpoint);
+					let $statusBar = document.createElement('status-bar');
+					let points = $statusBar.setLogs(endpoint);
+					endpointPoints.push(points);
+					latest.push({name: endpoint.name, status: $statusBar.lastStatus});
 
-					$site.append($endpoint);
+					$site.append(renderCard($endpointName, $statusBar, points, 'endpoint'));
 				}
 				if(config.combinedBar && nEndpoints>1) {
 					let $statusBar = document.createElement('status-bar');
@@ -79,12 +109,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 						let tcp = Math.max(...endpointPoints.map(p=>p[i]?.tcp).filter(p=>p));
 						combinedLogs.push({t, err, ttfb, dur, dns, tcp});
 					}
-					$statusBar.setLogs({logs: combinedLogs, responseTimeGood: config.responseTimeGood, responseTimeWarning: config.responseTimeWarning});
-					$site.querySelector('h1').after($statusBar);
+					let points = $statusBar.setLogs({logs: combinedLogs, responseTimeGood: config.responseTimeGood, responseTimeWarning: config.responseTimeWarning});
+					$siteName.after(renderCard(el('h3', '', 'All services'), $statusBar, points, 'combined'));
 				}
 			}
+			renderBanner(bPulse.overallStatus(latest, {stale: isStale()}));
 		} catch (error) {
-			setError("Error loading server status:", error);
+			setError(`Error loading server status: ${error.message}`);
+			renderBanner(bPulse.overallStatus([], {stale: true}));
 			console.log(error);
 		}
 	};
@@ -115,13 +147,14 @@ class StatusBar extends HTMLElement {
 		super();
 	}
 	setLogs(endpoint) {
-		console.log(endpoint);
 		let logs = endpoint.logs || [];
+		let good = endpoint.responseTimeGood ?? config.responseTimeGood;
+		let warn = endpoint.responseTimeWarning ?? config.responseTimeWarning;
 		this.innerHTML = '';
 		this.logs = logs;
 		let points = [];
 		let lastDate = lastPulse;
-		if(lastPulse < (Date.now() - config.interval*60_000 - 20_000 )) { // Detect when last pulse is too long ago, give grace period of 20sec -> Watcher is probably down, use Date.now
+		if(isStale()) { // Watcher is probably down, use Date.now
 			lastDate = Date.now();
 		}
 		for(let i=config.nDataPoints-1;i>=0;i--) {
@@ -130,31 +163,22 @@ class StatusBar extends HTMLElement {
 			points.push(point);
 			const $entry = document.createElement('status-bar-entry');
 			$entry.setAttribute('tabindex', 0);
+			const status = bPulse.pointStatus(point, good, warn);
+			$entry.setAttribute('data-status', status);
 			if(point) {
 				$entry.innerHTML = `<div>
 					<strong>${formatDate(point.t)}</strong>
 					<em></em>
 				</div>`;
-				let status;
 				if(point.err) {
-					status = 'outage';
 					$entry.querySelector('em').before(point.err);
-				} else {
-					if(point.ttfb > endpoint.responseTimeWarning) {
-						status = 'highly-degraded';
-					} else if(point.ttfb > endpoint.responseTimeGood) {
-						status = 'degraded';
-					} else {
-						status = 'healthy';
-					}
 				}
-				$entry.setAttribute('data-status', status);
-				$entry.querySelector('em').innerText = `Latency: ${point.ttfb.toFixed(2)}ms`;
+				$entry.querySelector('em').innerText = `Latency: ${point.ttfb?.toFixed(2) ?? '—'}ms`;
 			} else {
-				$entry.setAttribute('data-status', 'none');
 				$entry.innerHTML = `<div><strong>No Data</strong></div>`;
 			}
 			this.append($entry);
+			this.lastStatus = status;
 		}
 		return points;
 	}
