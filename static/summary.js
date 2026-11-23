@@ -35,6 +35,10 @@
 		return { level: 'ok', title: 'All systems operational' };
 	};
 
+	// The banner reads the newest data point. A slow pulse can land one slot late,
+	// leaving the "now" slot empty, so fall back to the slot before it.
+	const latestStatus = (statuses) => statuses.slice(-2).filter(s => s !== 'none').pop() || 'none';
+
 	const formatAgo = (ms) => {
 		const min = Math.floor(ms / 60_000);
 		if (min < 1) return 'just now';
@@ -44,5 +48,5 @@
 		return `${Math.floor(h / 24)} d ago`;
 	};
 
-	globalThis.bPulse = { pointStatus, uptimePercent, formatUptime, overallStatus, formatAgo };
+	globalThis.bPulse = { pointStatus, uptimePercent, formatUptime, overallStatus, latestStatus, formatAgo };
 })();

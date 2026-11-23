@@ -241,7 +241,8 @@ endpoint-info > div {
 	flex-flow: column nowrap;
 	align-items: center;
 	width: max-content;
-	max-width: min(320px, 80vw);
+	max-width: min(240px, 70vw);
+	overflow-wrap: anywhere;
 	padding: 6px 10px;
 	background: var(--surface);
 	color: var(--text);
@@ -263,7 +264,7 @@ endpoint-info > div {
 	}
 }
 status-bar-entry, endpoint-info {
-	&:hover > div, &:focus-visible > div {
+	&:hover > div, &:focus > div {
 		pointer-events: initial;
 		transform: translate(-50%, -6px);
 		opacity: 1;
@@ -303,11 +304,10 @@ status-bar {
 		&:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--muted); }
 	}
 }
-/* Edge tooltips: keep them inside the card */
-status-bar-entry:nth-child(-n+8) > div { left: 0; transform: translate(0, 0); }
-status-bar-entry:nth-child(-n+8):is(:hover, :focus-visible) > div { transform: translate(0, -6px); }
-status-bar-entry:nth-last-child(-n+8) > div { left: auto; right: 0; transform: translate(0, 0); }
-status-bar-entry:nth-last-child(-n+8):is(:hover, :focus-visible) > div { transform: translate(0, -6px); }
+/* Edge tooltips: outer thirds open inwards so they stay on screen (data-align set in client.js) */
+status-bar-entry[data-align="start"] > div { left: 0; transform: translate(0, 0); }
+status-bar-entry[data-align="end"] > div { left: auto; right: 0; transform: translate(0, 0); }
+status-bar-entry[data-align]:is(:hover, :focus) > div { transform: translate(0, -6px); }
 
 @media (max-width: 480px) {
 	body { padding: 24px 16px; }

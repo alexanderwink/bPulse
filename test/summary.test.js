@@ -61,3 +61,10 @@ test('overallStatus: several slow endpoints are listed', () => {
 	assert.deepEqual(b.overallStatus([{ name: 'API', status: 'degraded' }, { name: 'Web app', status: 'highly-degraded' }], { stale: false }),
 		{ level: 'degraded', title: 'API, Web app are experiencing slow responses' });
 });
+
+test('latestStatus uses the newest non-empty of the last two slots', () => {
+	assert.equal(b.latestStatus(['healthy', 'outage', 'none']), 'outage');
+	assert.equal(b.latestStatus(['outage', 'healthy', 'degraded']), 'degraded');
+	assert.equal(b.latestStatus(['outage', 'none', 'none']), 'none');
+	assert.equal(b.latestStatus([]), 'none');
+});

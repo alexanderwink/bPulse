@@ -77,7 +77,8 @@
       },
       {
        "t": 1795367700000,
-       "ttfb": 155
+       "ttfb": 155,
+       "err": "fetch failed: https://api.example.com/v1/really/long/path/without/any/breaks/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       {
        "t": 1795368600000,

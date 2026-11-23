@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 					let $statusBar = document.createElement('status-bar');
 					let points = $statusBar.setLogs(endpoint);
 					endpointPoints.push(points);
-					latest.push({name: endpoint.name, status: $statusBar.lastStatus});
+					latest.push({name: endpoint.name, status: bPulse.latestStatus($statusBar.statuses)});
 
 					$site.append(renderCard($endpointName, $statusBar, points, 'endpoint'));
 				}
@@ -153,6 +153,7 @@ class StatusBar extends HTMLElement {
 		this.innerHTML = '';
 		this.logs = logs;
 		let points = [];
+		this.statuses = [];
 		let lastDate = lastPulse;
 		if(isStale()) { // Watcher is probably down, use Date.now
 			lastDate = Date.now();
@@ -165,6 +166,10 @@ class StatusBar extends HTMLElement {
 			$entry.setAttribute('tabindex', 0);
 			const status = bPulse.pointStatus(point, good, warn);
 			$entry.setAttribute('data-status', status);
+			// Tooltip alignment so it stays on screen: left third opens rightwards, right third leftwards
+			const pos = (config.nDataPoints-1-i) / config.nDataPoints;
+			if(pos < 1/3) $entry.dataset.align = 'start';
+			else if(pos >= 2/3) $entry.dataset.align = 'end';
 			if(point) {
 				$entry.innerHTML = `<div>
 					<strong>${formatDate(point.t)}</strong>
@@ -178,7 +183,7 @@ class StatusBar extends HTMLElement {
 				$entry.innerHTML = `<div><strong>No Data</strong></div>`;
 			}
 			this.append($entry);
-			this.lastStatus = status;
+			this.statuses.push(status);
 		}
 		return points;
 	}
